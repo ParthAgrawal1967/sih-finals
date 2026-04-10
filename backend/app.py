@@ -28,8 +28,10 @@ load_dotenv()
 # ----------------------------
 # CONFIG
 # ----------------------------
-MODEL_ROOT = "models"
-DATA_ROOT = "data"
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_ROOT = os.path.join(BASE_DIR, "..", "models")
+DATA_ROOT = os.path.join(BASE_DIR, "..", "data")
 
 GLOBAL_MODEL_PATH = os.path.join(MODEL_ROOT, "cpo_lstm_model.h5")
 GLOBAL_SCALER_PATH = os.path.join(MODEL_ROOT, "data_scaler.pkl")

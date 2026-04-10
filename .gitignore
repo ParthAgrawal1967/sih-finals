@@ -49,4 +49,3 @@ yarn-error.log*
 Thumbs.db
 
 # Models (large files)
-models/
