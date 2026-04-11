@@ -30,15 +30,35 @@ load_dotenv()
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Use backend/models and backend/data first; fallback to root level if needed
-MODEL_ROOT = os.path.join(BASE_DIR, "models")
-DATA_ROOT = os.path.join(BASE_DIR, "data")
+# Find models and data directories with multiple fallbacks
+# Try in order: backend/models, ../models, ../../models (for Render's /opt structure)
+possible_model_roots = [
+    os.path.join(BASE_DIR, "models"),
+    os.path.join(BASE_DIR, "..", "models"),
+    os.path.join(BASE_DIR, "..", "..", "models"),
+]
+possible_data_roots = [
+    os.path.join(BASE_DIR, "data"),
+    os.path.join(BASE_DIR, "..", "data"),
+    os.path.join(BASE_DIR, "..", "..", "data"),
+]
 
-# Fallback to root-level directories if backend directories don't exist
-if not os.path.exists(MODEL_ROOT):
-    MODEL_ROOT = os.path.join(BASE_DIR, "..", "models")
-if not os.path.exists(DATA_ROOT):
-    DATA_ROOT = os.path.join(BASE_DIR, "..", "data")
+MODEL_ROOT = None
+DATA_ROOT = None
+
+for path in possible_model_roots:
+    if os.path.exists(path):
+        MODEL_ROOT = path
+        break
+if MODEL_ROOT is None:
+    MODEL_ROOT = possible_model_roots[0]  # Use first as default even if not found
+
+for path in possible_data_roots:
+    if os.path.exists(path):
+        DATA_ROOT = path
+        break
+if DATA_ROOT is None:
+    DATA_ROOT = possible_data_roots[0]  # Use first as default even if not found
 
 GLOBAL_MODEL_PATH = os.path.join(MODEL_ROOT, "global", "cpo_lstm_model.h5")
 GLOBAL_SCALER_PATH = os.path.join(MODEL_ROOT, "global", "data_scaler.pkl")
