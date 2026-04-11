@@ -60,9 +60,21 @@ for path in possible_data_roots:
 if DATA_ROOT is None:
     DATA_ROOT = possible_data_roots[0]  # Use first as default even if not found
 
-GLOBAL_MODEL_PATH = os.path.join(MODEL_ROOT, "global", "cpo_lstm_model.h5")
-GLOBAL_SCALER_PATH = os.path.join(MODEL_ROOT, "global", "data_scaler.pkl")
-INDIA_IMPORT_MODEL_PATH = os.path.join(MODEL_ROOT, "indian", "xgb_gen11_imports_tonnes.json")
+# Support both folder layouts:
+# 1) backend/models/global/... and backend/models/indian/...
+# 2) backend/models/cpo_lstm_model.h5, data_scaler.pkl, xgb_gen11_imports_tonnes.json
+if os.path.exists(os.path.join(MODEL_ROOT, "global", "cpo_lstm_model.h5")):
+    GLOBAL_MODEL_PATH = os.path.join(MODEL_ROOT, "global", "cpo_lstm_model.h5")
+    GLOBAL_SCALER_PATH = os.path.join(MODEL_ROOT, "global", "data_scaler.pkl")
+    INDIA_IMPORT_MODEL_PATH = os.path.join(MODEL_ROOT, "indian", "xgb_gen11_imports_tonnes.json")
+elif os.path.exists(os.path.join(MODEL_ROOT, "cpo_lstm_model.h5")):
+    GLOBAL_MODEL_PATH = os.path.join(MODEL_ROOT, "cpo_lstm_model.h5")
+    GLOBAL_SCALER_PATH = os.path.join(MODEL_ROOT, "data_scaler.pkl")
+    INDIA_IMPORT_MODEL_PATH = os.path.join(MODEL_ROOT, "xgb_gen11_imports_tonnes.json")
+else:
+    GLOBAL_MODEL_PATH = os.path.join(MODEL_ROOT, "global", "cpo_lstm_model.h5")
+    GLOBAL_SCALER_PATH = os.path.join(MODEL_ROOT, "global", "data_scaler.pkl")
+    INDIA_IMPORT_MODEL_PATH = os.path.join(MODEL_ROOT, "indian", "xgb_gen11_imports_tonnes.json")
 
 INDIA_BASE_FILE = os.path.join(DATA_ROOT, "india_cpo_clean_ml_dataset_gen11_with_landed.csv")
 GLOBAL_DATA_FILE = os.path.join(DATA_ROOT, "global_dataset.csv")
