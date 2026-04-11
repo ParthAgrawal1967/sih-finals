@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes as RouterRoutes, Route } from "react-router-dom";
+import { BrowserRouter, Routes as RouterRoutes, Route, Navigate } from "react-router-dom";
 import ScrollToTop from "components/ScrollToTop";
 import ErrorBoundary from "components/ErrorBoundary";
 import NotFound from "pages/NotFound";
@@ -12,7 +12,6 @@ import LandCultivationAnalysis from "./pages/land-cultivation-analysis";
 import Login from "./pages/auth/Login";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 
-// ⭐ Add this import
 import AuditLogsPage from "./pages/audit/AuditLogsPage";
 
 const Routes = () => {
@@ -25,16 +24,10 @@ const Routes = () => {
           {/* Public Route */}
           <Route path="/login" element={<Login />} />
 
-          {/* Protected Routes */}
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <TariffSimulationBuilder />
-              </ProtectedRoute>
-            }
-          />
+          {/* Root redirect to login */}
+          <Route path="/" element={<Navigate to="/login" replace />} />
 
+          {/* Protected Routes */}
           <Route
             path="/tariff-simulation-builder"
             element={
@@ -80,7 +73,7 @@ const Routes = () => {
             }
           />
 
-          {/* ⭐ NEW AUDIT LOGS ROUTE */}
+          {/* Audit Logs Route */}
           <Route
             path="/audit-logs"
             element={
@@ -92,6 +85,7 @@ const Routes = () => {
 
           {/* Catch All */}
           <Route path="*" element={<NotFound />} />
+
         </RouterRoutes>
       </ErrorBoundary>
     </BrowserRouter>
