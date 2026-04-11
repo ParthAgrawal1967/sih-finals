@@ -33,9 +33,9 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_ROOT = os.path.join(BASE_DIR, "models")
 DATA_ROOT = os.path.join(BASE_DIR, "data")
 
-GLOBAL_MODEL_PATH = os.path.join(MODEL_ROOT, "cpo_lstm_model.h5")
-GLOBAL_SCALER_PATH = os.path.join(MODEL_ROOT, "data_scaler.pkl")
-INDIA_IMPORT_MODEL_PATH = os.path.join(MODEL_ROOT, "xgb_gen11_imports_tonnes.json")
+GLOBAL_MODEL_PATH = os.path.join(MODEL_ROOT, "global", "cpo_lstm_model.h5")
+GLOBAL_SCALER_PATH = os.path.join(MODEL_ROOT, "global", "data_scaler.pkl")
+INDIA_IMPORT_MODEL_PATH = os.path.join(MODEL_ROOT, "indian", "xgb_gen11_imports_tonnes.json")
 
 INDIA_BASE_FILE = os.path.join(DATA_ROOT, "india_cpo_clean_ml_dataset_gen11_with_landed.csv")
 GLOBAL_DATA_FILE = os.path.join(DATA_ROOT, "global_dataset.csv")
