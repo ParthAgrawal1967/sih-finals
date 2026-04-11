@@ -29,8 +29,16 @@ load_dotenv()
 # ----------------------------
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_ROOT = os.path.join(BASE_DIR, "..", "models")  # go up from backend/ to root
-DATA_ROOT = os.path.join(BASE_DIR, "..", "data")      # go up from backend/ to root
+
+# Use backend/models and backend/data first; fallback to root level if needed
+MODEL_ROOT = os.path.join(BASE_DIR, "models")
+DATA_ROOT = os.path.join(BASE_DIR, "data")
+
+# Fallback to root-level directories if backend directories don't exist
+if not os.path.exists(MODEL_ROOT):
+    MODEL_ROOT = os.path.join(BASE_DIR, "..", "models")
+if not os.path.exists(DATA_ROOT):
+    DATA_ROOT = os.path.join(BASE_DIR, "..", "data")
 
 GLOBAL_MODEL_PATH = os.path.join(MODEL_ROOT, "global", "cpo_lstm_model.h5")
 GLOBAL_SCALER_PATH = os.path.join(MODEL_ROOT, "global", "data_scaler.pkl")
@@ -292,6 +300,11 @@ class SimulateRequest(BaseModel):
     horizon_months: int
     farmer_margin_pct: float
     last_global_window: Optional[List] = None
+    scenario_type: Optional[str] = None
+    scenario_parameters: Optional[dict] = None
+    
+    class Config:
+        extra = "allow"  # Allow extra fields from frontend
 
 class SimulateResponse(BaseModel):
     scenario: dict
@@ -312,6 +325,13 @@ LAST_INDIA_ROW = None
 DF_GLOBAL = None
 
 try:
+    # Log paths for debugging
+    print(f"DEBUG: GLOBAL_MODEL_PATH = {GLOBAL_MODEL_PATH}")
+    print(f"DEBUG: GLOBAL_SCALER_PATH = {GLOBAL_SCALER_PATH}")
+    print(f"DEBUG: INDIA_IMPORT_MODEL_PATH = {INDIA_IMPORT_MODEL_PATH}")
+    print(f"DEBUG: INDIA_BASE_FILE = {INDIA_BASE_FILE}")
+    print(f"DEBUG: GLOBAL_DATA_FILE = {GLOBAL_DATA_FILE}")
+    
     GLOBAL_MODEL = load_model(GLOBAL_MODEL_PATH)
     scalers = joblib.load(GLOBAL_SCALER_PATH)
     SCALER_X = scalers["scaler_x"]
@@ -329,9 +349,13 @@ try:
         if "date" in DF_GLOBAL.columns:
             DF_GLOBAL["date"] = pd.to_datetime(DF_GLOBAL["date"])
             DF_GLOBAL = DF_GLOBAL.sort_values("date").reset_index(drop=True)
-
+    
+    print("DEBUG: All models and data loaded successfully")
 except Exception as e:
-    STARTUP_ERROR = str(e)
+    STARTUP_ERROR = f"{type(e).__name__}: {str(e)}"
+    print(f"ERROR during startup: {STARTUP_ERROR}")
+    import traceback
+    traceback.print_exc()
 
 INDIAN_FEATURE_ORDER = [
     "year",
