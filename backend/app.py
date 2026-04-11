@@ -1,4 +1,3 @@
-# backend/app.py
 import os
 import json
 from typing import List, Optional
@@ -30,8 +29,8 @@ load_dotenv()
 # ----------------------------
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_ROOT = os.path.join(BASE_DIR, "models")
-DATA_ROOT = os.path.join(BASE_DIR, "data")
+MODEL_ROOT = os.path.join(BASE_DIR, "..", "models")  # go up from backend/ to root
+DATA_ROOT = os.path.join(BASE_DIR, "..", "data")      # go up from backend/ to root
 
 GLOBAL_MODEL_PATH = os.path.join(MODEL_ROOT, "global", "cpo_lstm_model.h5")
 GLOBAL_SCALER_PATH = os.path.join(MODEL_ROOT, "global", "data_scaler.pkl")
@@ -194,7 +193,6 @@ def _to_float(value):
 
 
 def _extract_lakh_ha(record):
-    # Supports alternate source schemas. If only hectares are present, convert to lakh hectares.
     candidate_keys_lakh = [
         "palmArea", "palm_area_lakh_ha", "area_lakh_ha", "achievement_lakh_ha", "ach_lakh_ha"
     ]
@@ -203,8 +201,6 @@ def _extract_lakh_ha(record):
         if val is not None:
             return val
 
-    # Special handling for data.gov.in NMEO-OP schema:
-    # Use latest year achievement first (_2023_24___ach), then fallback.
     latest_ach = _to_float(record.get("_2023_24___ach"))
     if latest_ach is not None:
         return latest_ach / 100000.0
@@ -316,22 +312,18 @@ LAST_INDIA_ROW = None
 DF_GLOBAL = None
 
 try:
-    # Global LSTM + scalers
     GLOBAL_MODEL = load_model(GLOBAL_MODEL_PATH)
     scalers = joblib.load(GLOBAL_SCALER_PATH)
     SCALER_X = scalers["scaler_x"]
     SCALER_Y = scalers["scaler_y"]
     FEATURE_NAMES = list(scalers["feature_names"])
 
-    # XGBoost booster (loaded from JSON)
     INDIAN_BST = xgb.Booster()
     INDIAN_BST.load_model(INDIA_IMPORT_MODEL_PATH)
 
-    # India dataset (for baseline last row)
     DF_INDIA = pd.read_csv(INDIA_BASE_FILE).sort_values(["year", "month"]).reset_index(drop=True)
     LAST_INDIA_ROW = DF_INDIA.iloc[-1]
 
-    # Global dataset (optional fallback)
     if os.path.exists(GLOBAL_DATA_FILE):
         DF_GLOBAL = pd.read_csv(GLOBAL_DATA_FILE)
         if "date" in DF_GLOBAL.columns:
@@ -341,10 +333,6 @@ try:
 except Exception as e:
     STARTUP_ERROR = str(e)
 
-# ----------------------------
-# IMPORTANT: exact feature order extracted from your XGB JSON model
-# (this list is taken directly from the model metadata; must match exactly)
-# ----------------------------
 INDIAN_FEATURE_ORDER = [
     "year",
     "month",
@@ -364,7 +352,6 @@ INDIAN_FEATURE_ORDER = [
     "imports_tonnes_lag6",
 ]
 
-# A reasonable template for missing fields (will be overwritten by LAST_INDIA_ROW values)
 INDIAN_FEATURE_TEMPLATE = {
     "year": 2025,
     "month": 1,
@@ -388,15 +375,9 @@ INDIAN_FEATURE_TEMPLATE = {
 # Helpers: global forecast
 # ----------------------------
 def expand_price_to_feature_row(price, feature_names):
-    """
-    If DF_GLOBAL available, copy last feature row but replace first price-like column with `price`.
-    Otherwise return zeros with price in position 0.
-    """
     if DF_GLOBAL is not None:
         try:
-            # pick last row of the same feature columns if present
             last_row = DF_GLOBAL[feature_names].iloc[-1].values.astype(float)
-            # replace the first feature (assumed to be price) with new price
             last_row[0] = float(price)
             return last_row
         except Exception:
@@ -406,30 +387,19 @@ def expand_price_to_feature_row(price, feature_names):
     return arr
 
 def recursive_global_forecast(last_window_input: List, months: int) -> List[float]:
-    """
-    Accepts:
-      - [1000, 1010, 990]  (scalar price list)
-      - [[1000], [1010], [990]] (single-element lists)
-      - [[f1..fN], [f1..fN], [f1..fN]] (full feature rows)
-    Returns list of forecasted global CPO prices (USD/tonne), length == months
-    """
     if GLOBAL_MODEL is None or SCALER_X is None or SCALER_Y is None:
         raise RuntimeError(f"Global model/scalers not loaded: {STARTUP_ERROR}")
 
-    # normalize input forms into a numeric recent_window (numpy rows)
     recent_window = []
 
     for item in last_window_input:
-        # full feature row (len matches)
         if isinstance(item, (list, tuple, np.ndarray)) and len(item) == len(FEATURE_NAMES):
             recent_window.append(np.array(item, dtype=float))
             continue
 
-        # single-element list (unpack)
         if isinstance(item, (list, tuple)) and len(item) == 1:
             item = item[0]
 
-        # now expect scalar
         try:
             price = float(item)
         except Exception:
@@ -437,7 +407,6 @@ def recursive_global_forecast(last_window_input: List, months: int) -> List[floa
 
         recent_window.append(expand_price_to_feature_row(price, FEATURE_NAMES))
 
-    # pad/trim to TIME_STEPS
     while len(recent_window) < TIME_STEPS:
         recent_window.insert(0, recent_window[0].copy())
     recent_window = np.vstack(recent_window[-TIME_STEPS:])
@@ -447,11 +416,9 @@ def recursive_global_forecast(last_window_input: List, months: int) -> List[floa
         scaled_input = SCALER_X.transform(recent_window)
         reshaped = scaled_input.reshape(1, TIME_STEPS, scaled_input.shape[1])
         y_scaled = GLOBAL_MODEL.predict(reshaped)
-        # SCALER_Y expects 2D input; invert transform accordingly
         y = float(SCALER_Y.inverse_transform(y_scaled.reshape(-1, 1))[0][0])
         preds.append(y)
 
-        # slide window and append new row (replace first feature with predicted price)
         new_row = recent_window[-1].copy()
         new_row[0] = y
         recent_window = np.vstack([recent_window[1:], new_row])
@@ -462,11 +429,6 @@ def recursive_global_forecast(last_window_input: List, months: int) -> List[floa
 # XGB predict wrapper
 # ----------------------------
 def predict_imports_from_xgb(X_df: pd.DataFrame) -> np.ndarray:
-    """
-    Input: DataFrame with columns exactly matching INDIAN_FEATURE_ORDER
-    Returns: numpy array of predictions
-    """
-    # XGBoost Booster (loaded from JSON) expects DMatrix
     dm = xgb.DMatrix(X_df)
     preds = INDIAN_BST.predict(dm)
     return preds
@@ -506,7 +468,6 @@ def simulate(req: SimulateRequest):
     months = req.horizon_months
     farmer_margin_fraction = req.farmer_margin_pct / 100.0
 
-    # prepare last_global_window
     if req.last_global_window:
         last_window = req.last_global_window
     else:
@@ -515,25 +476,21 @@ def simulate(req: SimulateRequest):
         else:
             raise HTTPException(status_code=400, detail="No last_global_window provided and global data unavailable.")
 
-    # global forecast
     try:
         global_preds = recursive_global_forecast(last_window, months)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Global forecasting failed: {e}")
 
-    # india baseline
     base = LAST_INDIA_ROW
     imports_lag1 = float(base["imports_tonnes"]) if "imports_tonnes" in base else float(INDIAN_FEATURE_TEMPLATE["imports_tonnes_lag1"])
     imports_lag3 = imports_lag1
     imports_lag6 = imports_lag1
 
-    # tariff history baseline (use last known tariff if present)
     last_tariff = float(base["tariff_pct"]) if "tariff_pct" in base else tariff_pct
     tariff_history = [last_tariff] * 6
 
     time_series = []
     for i, gp in enumerate(global_preds):
-        # populate a row dict exactly with keys used by model
         row = INDIAN_FEATURE_TEMPLATE.copy()
         row["year"] = int(base.get("year", row["year"]))
         row["month"] = int(base.get("month", row["month"])) + i + 1
@@ -545,35 +502,28 @@ def simulate(req: SimulateRequest):
         row["domestic_production_tonnes"] = float(base.get("domestic_production_tonnes", row["domestic_production_tonnes"]))
         row["demand_supply_gap"] = row["domestic_consumption_tonnes"] - row["domestic_production_tonnes"]
 
-        # tariff dynamics
         row["tariff_pct"] = tariff_pct
         row["tariff_change_pct"] = float(tariff_pct - tariff_history[-1])
         row["tariff_shock"] = 1 if abs(row["tariff_change_pct"]) >= 5 else 0
         row["tariff_3m_avg"] = float(np.mean(tariff_history[-3:]))
         row["tariff_6m_avg"] = float(np.mean(tariff_history[-6:]))
 
-        # lags
         row["imports_tonnes_lag1"] = imports_lag1
         row["imports_tonnes_lag3"] = imports_lag3
         row["imports_tonnes_lag6"] = imports_lag6
 
-        # build X dataframe for xgboost in the exact order
         X_row = pd.DataFrame([[row[col] for col in INDIAN_FEATURE_ORDER]], columns=INDIAN_FEATURE_ORDER)
 
-        # predict imports
         try:
             pred_imports = float(predict_imports_from_xgb(X_row)[0])
         except Exception as e:
-            # return the raw model error message with context
             raise HTTPException(status_code=500, detail=f"Indian model prediction error: {e}")
 
-        # update lags and tariff history
         imports_lag6 = imports_lag3
         imports_lag3 = imports_lag1
         imports_lag1 = pred_imports
         tariff_history.append(tariff_pct)
 
-        # economics
         cif = compute_cif(row["global_cpo_price_usd_per_tonne"], row["usd_inr"], row["freight_usd"])
         landed = compute_landed(cif, tariff_pct)
         retail = compute_retail_price(landed)
@@ -605,12 +555,9 @@ def simulate(req: SimulateRequest):
     }
 
 # ---------------------------------------------------------
-# AI INTERPRETATION (Gemini via REST API — Guaranteed to work)
+# AI INTERPRETATION
 # ---------------------------------------------------------
 from huggingface_hub import InferenceClient
-from fastapi import FastAPI
-from pydantic import BaseModel
-import os
 
 HF_API_KEY = os.getenv("HF_API_KEY")
 
@@ -618,10 +565,6 @@ client = InferenceClient(
     "meta-llama/Llama-3.1-70B-Instruct",
     token=HF_API_KEY
 )
-
-# ---------------------------
-# Request / Response Models
-# ---------------------------
 
 class InterpretRequest(BaseModel):
     tariff_change_pct: float
@@ -635,10 +578,6 @@ class InterpretResponse(BaseModel):
     risks: list
 
 
-# ---------------------------
-# INTERPRET ENDPOINT
-# ---------------------------
-
 @app.post("/interpret", response_model=InterpretResponse)
 async def interpret(request: InterpretRequest):
 
@@ -646,7 +585,6 @@ async def interpret(request: InterpretRequest):
     summary = request.summary
     monthly = request.monthly_outputs
 
-    # ---- PROMPT (same structure as earlier) ----
     prompt = f"""
 You are an economic policy analyst specializing in agri-trade and tariff modelling.
 
@@ -664,25 +602,24 @@ You are an economic policy analyst specializing in agri-trade and tariff modelli
 
 ## TASKS
 
-### 1. Narrative overview (5–7 sentences)
+### 1. Narrative overview (5-7 sentences)
 Explain impacts on imports, landed cost, domestic price, farmer income, and government revenue.
 
-### 2. Bullet-point economic impact summary (use ⬆️ ⬇️ ➡️)
+### 2. Bullet-point economic impact summary (use up/down arrows)
 
-### 3. Policy recommendations (3–5)
+### 3. Policy recommendations (3-5)
 
 ### 4. Key risks (3)
 
-### 5. ASCII Mini-Charts (use █ blocks)
+### 5. ASCII Mini-Charts (use block characters)
 Charts for:
 - Predicted Monthly Imports  
 - Landed Cost Trend  
 - Import Dependency Trend  
 
 IMPORTANT:
-• Output must be Markdown  
-• No backticks  
-• Do NOT invent numbers  
+Output must be Markdown  
+Do NOT invent numbers  
 """
 
     try:
@@ -698,7 +635,7 @@ IMPORTANT:
 
     except Exception as e:
         print("HF API ERROR:", e)
-        response_text = f"❌ AI Interpretation failed: {e}"
+        response_text = f"AI Interpretation failed: {e}"
 
     return {
         "overview": response_text,
@@ -729,14 +666,10 @@ def simulate_scenario_endpoint(req: ScenarioSimRequest):
     if STARTUP_ERROR:
         raise HTTPException(status_code=500, detail=f"Startup error: {STARTUP_ERROR}")
 
-    # build initial state from LAST_INDIA_ROW and last known global price
-    # If frontend supplied a last_global_window, use most recent value to set initial global price
     if req.last_global_window and len(req.last_global_window) > 0:
         last_price = None
-        # accept scalar or list-of-features
         v = req.last_global_window[-1]
         if isinstance(v, (list, tuple)):
-            # try to extract first element as price
             last_price = float(v[0])
         else:
             try:
@@ -744,7 +677,6 @@ def simulate_scenario_endpoint(req: ScenarioSimRequest):
             except Exception:
                 last_price = float(LAST_INDIA_ROW.get("global_cpo_price_usd_per_tonne", 0.0))
     else:
-        # fallback: use last value from DF_GLOBAL if available, else from LAST_INDIA_ROW
         if DF_GLOBAL is not None and "global_cpo_price_usd_per_tonne" in DF_GLOBAL.columns:
             last_price = float(DF_GLOBAL["global_cpo_price_usd_per_tonne"].iloc[-1])
         else:
@@ -752,7 +684,6 @@ def simulate_scenario_endpoint(req: ScenarioSimRequest):
 
     initial_state = make_initial_state(LAST_INDIA_ROW, last_price)
 
-    # assemble callables to pass into engine (these are the baseline functions defined earlier in app.py)
     try:
         out = simulate_scenario(
             initial_state=initial_state,
@@ -773,7 +704,6 @@ def simulate_scenario_endpoint(req: ScenarioSimRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Scenario simulation failed: {e}")
 
-    # For backward compatibility, include 'time_series' and 'final_summary'
     return out
 
 # ------------------------------------------------------------
@@ -796,35 +726,24 @@ class ExportRequest(BaseModel):
     interpretation: str
 
 
-# ------------------------------------------------------------
-# 1️⃣ EXPORT AS PDF
-# ------------------------------------------------------------
 @app.post("/export/pdf")
 async def export_pdf(req: ExportRequest):
     buffer = BytesIO()
 
-    # Setup PDF Canvas
     pdf = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
 
-    # Margins
     x = 40
     y = height - 50
 
-    # -----------------------
-    # MEITY Header
-    # -----------------------
     pdf.setFont("Helvetica-Bold", 14)
-    pdf.drawString(x, y, "PalmTariff-AI – Government Policy Analytics")
+    pdf.drawString(x, y, "PalmTariff-AI - Government Policy Analytics")
     y -= 20
 
     pdf.setFont("Helvetica", 10)
     pdf.drawString(x, y, f"Export Timestamp: {datetime.datetime.now()}")
     y -= 30
 
-    # -----------------------
-    # Simulation Parameters
-    # -----------------------
     pdf.setFont("Helvetica-Bold", 12)
     pdf.drawString(x, y, "Simulation Parameters")
     y -= 20
@@ -839,9 +758,6 @@ async def export_pdf(req: ExportRequest):
     pdf.drawString(x, y, f"Parameters: {req.scenarioParams}")
     y -= 30
 
-    # -----------------------
-    # KPI Summary
-    # -----------------------
     pdf.setFont("Helvetica-Bold", 12)
     pdf.drawString(x, y, "KPI Summary")
     y -= 20
@@ -858,16 +774,13 @@ async def export_pdf(req: ExportRequest):
 
     y -= 20
 
-    # -----------------------
-    # Interpretation Section
-    # -----------------------
     pdf.setFont("Helvetica-Bold", 12)
     pdf.drawString(x, y, "AI Interpretation")
     y -= 20
 
     pdf.setFont("Helvetica", 10)
     for line in req.interpretation.split("\n"):
-        pdf.drawString(x, y, line[:120])  # Limit width
+        pdf.drawString(x, y, line[:120])
         y -= 15
         if y < 60:
             pdf.showPage()
@@ -886,24 +799,15 @@ async def export_pdf(req: ExportRequest):
     )
 
 
-# ------------------------------------------------------------
-# 2️⃣ EXPORT AS EXCEL
-# ------------------------------------------------------------
 @app.post("/export/excel")
 async def export_excel(req: ExportRequest):
     wb = Workbook()
     ws = wb.active
     ws.title = "Simulation Report"
 
-    # -----------------------
-    # Header
-    # -----------------------
-    ws["A1"] = "PalmTariff-AI – Export Report"
+    ws["A1"] = "PalmTariff-AI - Export Report"
     ws["A2"] = f"Timestamp: {datetime.datetime.now()}"
 
-    # -----------------------
-    # Simulation Parameters
-    # -----------------------
     ws.append([""])
     ws.append(["Simulation Parameters"])
     ws.append(["Tariff Change (%)", req.tariffChange])
@@ -911,9 +815,6 @@ async def export_excel(req: ExportRequest):
     ws.append(["Scenario Type", req.scenarioType])
     ws.append(["Scenario Params", str(req.scenarioParams)])
 
-    # -----------------------
-    # KPI SUMMARY
-    # -----------------------
     ws.append([""])
     ws.append(["KPI Summary"])
 
@@ -921,9 +822,6 @@ async def export_excel(req: ExportRequest):
     for k, v in summary.items():
         ws.append([k, v])
 
-    # -----------------------
-    # Monthly Outputs
-    # -----------------------
     ws.append([""])
     ws.append(["Monthly Outputs"])
 
@@ -934,15 +832,11 @@ async def export_excel(req: ExportRequest):
         for row in monthly:
             ws.append(list(row.values()))
 
-    # -----------------------
-    # AI Interpretation
-    # -----------------------
     ws.append([""])
     ws.append(["AI Interpretation"])
     for line in req.interpretation.split("\n"):
         ws.append([line])
 
-    # Save file into memory
     file_stream = BytesIO()
     wb.save(file_stream)
     file_stream.seek(0)
@@ -957,10 +851,6 @@ async def export_excel(req: ExportRequest):
 
 @app.post("/overview/simulate", response_model=OverviewSimulateResponse)
 async def overview_simulate(req: OverviewSimulateRequest):
-    """
-    Global multi-country CPO policy sandbox.
-    Used by the Overview/Simulator tab.
-    """
     timeline = overview_run_simulation(
         horizon=req.horizon,
         actions=[a.dict(exclude_none=True) for a in req.actions],
@@ -985,10 +875,6 @@ class PolicyQuestionResponse(BaseModel):
 
 @app.post("/overview/ask", response_model=PolicyQuestionResponse)
 async def ask_policy_question(req: PolicyQuestionRequest):
-    """
-    AI-powered policy reasoning on top of deterministic simulator output.
-    """
-
     prompt = f"""
 You are a senior trade and agriculture policy advisor to the Government of India.
 
@@ -1027,7 +913,6 @@ INSTRUCTIONS:
         answer_text = f"AI policy analysis failed: {e}"
 
     return {"answer": answer_text}
-
 
 
 @app.get("/")
