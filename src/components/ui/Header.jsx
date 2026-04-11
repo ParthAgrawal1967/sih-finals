@@ -28,8 +28,12 @@ const Header = () => {
         
         {/* Logo */}
         <div className="flex items-center space-x-3">
-          <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-[#4b78c2] to-[#7ea4db] rounded-xl shadow-[0_10px_20px_-14px_rgba(43,93,170,0.9)]">
-            <Icon name="Zap" size={24} color="white" />
+          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-white shadow-[0_10px_20px_-14px_rgba(43,93,170,0.35)] overflow-hidden">
+            <img
+              src="/assets/images/app-logo.jpeg"
+              alt="PalmTariff logo"
+              className="w-full h-full object-cover"
+            />
           </div>
           <div className="flex flex-col">
             <h1 className="text-lg font-semibold text-slate-800">PalmTariff-AI</h1>
