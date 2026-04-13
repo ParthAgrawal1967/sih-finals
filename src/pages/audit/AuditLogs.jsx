@@ -42,7 +42,7 @@ export default function AuditLogs() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background px-6 py-6">
+      <div className="min-h-screen bg-background px-4 sm:px-6 py-6">
         <div className="bg-card border border-blue-200/70 dark:border-blue-900/60 rounded-lg overflow-hidden shadow-sm">
           <div className="px-6 py-4 border-b border-blue-200/70 dark:border-blue-900/60 bg-gradient-to-r from-blue-50 via-indigo-50 to-cyan-50 dark:from-blue-950/50 dark:via-indigo-950/40 dark:to-cyan-950/40">
             <div className="flex items-center gap-2">
@@ -63,7 +63,7 @@ export default function AuditLogs() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-background px-6 py-6">
+      <div className="min-h-screen bg-background px-4 sm:px-6 py-6">
         <div className="bg-card border border-red-200 rounded-lg p-6 text-red-600">
           Error: {error}
         </div>
@@ -72,7 +72,7 @@ export default function AuditLogs() {
   }
 
   return (
-    <div className="min-h-screen bg-background px-6 py-6">
+    <div className="min-h-screen bg-background px-4 sm:px-6 py-6">
       <div className="bg-card border border-blue-200/70 dark:border-blue-900/60 rounded-lg overflow-hidden shadow-sm">
         <div className="px-6 py-4 border-b border-blue-200/70 dark:border-blue-900/60 bg-gradient-to-r from-blue-50 via-indigo-50 to-cyan-50 dark:from-blue-950/50 dark:via-indigo-950/40 dark:to-cyan-950/40">
           <div className="flex items-center justify-between gap-4">

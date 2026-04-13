@@ -186,7 +186,7 @@ const ScenarioComparison = () => {
     <div className="min-h-screen bg-background">
       <Header />
       <TabNavigation />
-      <main className="container mx-auto px-6 py-8 space-y-8">
+      <main className="container mx-auto px-4 sm:px-6 py-8 space-y-8">
         {/* Page Header */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
           <div>

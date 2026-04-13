@@ -66,7 +66,7 @@ const TabNavigation = () => {
 
   return (
     <div className="bg-white/85 backdrop-blur-md border-b border-border/80 sticky top-16 z-40">
-      <div className="px-6">
+      <div className="px-4 sm:px-6">
         <nav className="flex gap-1 overflow-x-auto scrollbar-hide py-1.5">
           {tabs?.map((tab) => (
             <Link

@@ -24,11 +24,11 @@ const Header = () => {
 
   return (
     <header className="sticky top-0 z-50 border-b border-border/80 bg-white/90 backdrop-blur-md shadow-[0_8px_22px_-18px_rgba(27,63,111,0.55)]">
-      <div className="flex items-center justify-between h-16 px-6">
+      <div className="flex items-center justify-between h-16 px-4 sm:px-6">
         
         {/* Logo */}
-        <div className="flex items-center space-x-3">
-          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-white shadow-[0_10px_20px_-14px_rgba(43,93,170,0.35)] overflow-hidden">
+        <div className="flex items-center space-x-2 sm:space-x-3">
+          <div className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white shadow-[0_10px_20px_-14px_rgba(43,93,170,0.35)] overflow-hidden">
             <img
               src="/assets/images/app-logo.jpeg"
               alt="PalmTariff logo"
@@ -36,8 +36,8 @@ const Header = () => {
             />
           </div>
           <div className="flex flex-col">
-            <h1 className="text-lg font-semibold text-slate-800">PalmTariff-AI</h1>
-            <span className="text-xs text-muted-foreground">Government Policy Analytics</span>
+            <h1 className="text-base sm:text-lg font-semibold text-slate-800">PalmTariff-AI</h1>
+            <span className="text-xs text-muted-foreground hidden sm:block">Government Policy Analytics</span>
           </div>
         </div>
 

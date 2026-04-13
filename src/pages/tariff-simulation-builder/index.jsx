@@ -144,7 +144,7 @@ const TariffSimulationBuilder = () => {
       <Header />
       <TabNavigation />
 
-      <main className="container mx-auto px-6 py-6 space-y-6">
+      <main className="container mx-auto px-4 sm:px-6 py-6 space-y-6">
 
         {/* Page header */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">

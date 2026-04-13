@@ -75,7 +75,7 @@ const OverviewDashboard = () => {
       <Header />
       <TabNavigation />
 
-      <div className="px-6 py-6 max-w-7xl mx-auto space-y-6">
+      <div className="px-4 sm:px-6 py-6 max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
           <div>
